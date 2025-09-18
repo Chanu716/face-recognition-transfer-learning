@@ -136,6 +136,7 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## 📧 Contact
 
 Created by K Chanikya - feel free to contact me!
+
 Email: karrichanikya@gmail.com
 Phone: 9182789929
 ---
