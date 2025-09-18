@@ -32,7 +32,7 @@ Uses the **LFW (Labeled Faces in the Wild)** dataset:
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/face-recognition-transfer-learning.git
+git clone https://github.com/Chanu716/face-recognition-transfer-learning.git
 cd face-recognition-transfer-learning
 
 # Install dependencies
@@ -135,8 +135,9 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## 📧 Contact
 
-Created by [Your Name] - feel free to contact me!
-
+Created by K Chanikya - feel free to contact me!
+Email: karrichanikya@gmail.com
+Phone: 9182789929
 ---
 
 ⭐ **Star this repo** if you found it helpful!
