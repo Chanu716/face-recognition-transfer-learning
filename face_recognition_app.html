@@ -1,0 +1,618 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+<head>
+    <meta charset="utf-8"/>
+    <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
+    <title>FaceID - LFW People Recognition</title>
+    <link href="data:image/x-icon;base64," rel="icon" type="image/x-icon"/>
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <link href="https://fonts.googleapis.com" rel="preconnect"/>
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect"/>
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&amp;display=swap" rel="stylesheet"/>
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        primary: "#1173d4",
+                        "background-light": "#f6f7f8",
+                        "background-dark": "#101922",
+                    },
+                    fontFamily: {
+                        display: ["Space Grotesk", "sans-serif"],
+                    },
+                    borderRadius: { DEFAULT: "0.25rem", lg: "0.5rem", xl: "0.75rem", full: "9999px" },
+                },
+            },
+        };
+    </script>
+    <style>
+        .material-symbols-outlined {
+            font-variation-settings: "FILL" 0, "wght" 400, "GRAD" 0, "opsz" 24;
+        }
+        
+        .upload-area {
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area.dragover {
+            border-color: #1173d4;
+            background-color: rgba(17, 115, 212, 0.1);
+        }
+        
+        .confidence-bar {
+            background: linear-gradient(90deg, #ef4444 0%, #f59e0b 50%, #10b981 100%);
+            height: 8px;
+            border-radius: 4px;
+            overflow: hidden;
+        }
+        
+        .confidence-fill {
+            background: white;
+            height: 100%;
+            transition: width 0.5s ease;
+        }
+        
+        .prediction-card {
+            transform: translateY(10px);
+            opacity: 0;
+            transition: all 0.5s ease;
+        }
+        
+        .prediction-card.show {
+            transform: translateY(0);
+            opacity: 1;
+        }
+        
+        .loading-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-radius: 50%;
+            border-top: 3px solid #ffffff;
+            width: 24px;
+            height: 24px;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-slate-800 dark:text-slate-200">
+    <div class="flex flex-col min-h-screen">
+        <header class="border-b border-slate-200/80 dark:border-slate-800/80 shadow-sm">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8">
+                <div class="flex h-16 items-center justify-between">
+                    <div class="flex items-center gap-4">
+                        <div class="text-primary size-7">
+                            <svg fill="none" viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+                                <path d="M44 4H30.6666V17.3334H17.3334V30.6666H4V44H44V4Z" fill="currentColor"></path>
+                            </svg>
+                        </div>
+                        <h2 class="text-xl font-bold text-slate-900 dark:text-white">FaceID</h2>
+                        <span class="text-xs bg-primary/20 text-primary px-2 py-1 rounded-full">LFW Dataset</span>
+                    </div>
+                    <nav class="hidden md:flex items-center gap-8">
+                        <a class="text-sm font-medium hover:text-primary transition-colors" href="https://www.kaggle.com/datasets/jessicali9530/lfw-dataset" target="_blank">Dataset</a>
+                    </nav>
+                    <div class="flex items-center gap-4">
+                        <button id="theme-toggle" class="p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <span class="material-symbols-outlined dark:hidden">dark_mode</span>
+                            <span class="material-symbols-outlined hidden dark:inline">light_mode</span>
+                        </button>
+                        <button class="md:hidden p-2 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800">
+                            <span class="material-symbols-outlined">menu</span>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="flex-grow container mx-auto px-4 sm:px-6 lg:px-8 py-12">
+            <div class="max-w-6xl mx-auto">
+                <div class="text-center mb-12">
+                    <h1 class="text-4xl md:text-5xl font-bold tracking-tighter text-slate-900 dark:text-white">LFW Face Recognition</h1>
+                    <p class="mt-4 text-lg text-slate-600 dark:text-slate-400">
+                        Upload an image to identify famous people from the Labeled Faces in the Wild dataset
+                    </p>
+                    <div class="mt-6 inline-flex items-center gap-2 px-4 py-2 bg-blue-50 dark:bg-blue-900/30 rounded-lg">
+                        <span class="material-symbols-outlined text-blue-600 dark:text-blue-400">info</span>
+                        <span class="text-sm text-blue-700 dark:text-blue-300">Can recognize 62 different people</span>
+                    </div>
+                </div>
+
+                <div class="grid lg:grid-cols-3 gap-8">
+                    <!-- Upload Section -->
+                    <div class="lg:col-span-2 space-y-6">
+                        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
+                            <h2 class="text-xl font-semibold mb-4 text-slate-900 dark:text-white">Upload Image</h2>
+                            
+                            <div id="upload-area" class="upload-area relative flex flex-col items-center justify-center w-full h-64 bg-slate-50 dark:bg-slate-700/50 border-2 border-dashed border-slate-300 dark:border-slate-600 rounded-xl transition-all hover:border-primary cursor-pointer">
+                                <div id="upload-prompt" class="text-center">
+                                    <span class="material-symbols-outlined text-5xl text-slate-400 dark:text-slate-500">upload_file</span>
+                                    <p class="mt-2 font-semibold text-slate-700 dark:text-slate-300">Drag and drop an image here</p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Supports JPG, PNG, GIF (max 10MB)</p>
+                                    <label class="mt-4 inline-flex items-center justify-center h-10 px-6 bg-primary text-white text-sm font-medium rounded-lg cursor-pointer hover:bg-primary/90 transition-colors" for="file-upload">
+                                        Browse Files
+                                    </label>
+                                </div>
+                                
+                                <div id="loading-state" class="hidden text-center">
+                                    <div class="loading-spinner mx-auto mb-4"></div>
+                                    <p class="font-semibold text-slate-700 dark:text-slate-300">Processing image...</p>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400">Running face recognition model</p>
+                                </div>
+                                
+                                <input class="sr-only" id="file-upload" name="file-upload" type="file" accept="image/*"/>
+                            </div>
+                        </div>
+
+                        <!-- Preview Section -->
+                        <div id="preview-section" class="hidden bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
+                            <h3 class="text-lg font-semibold mb-4 text-slate-900 dark:text-white">Uploaded Image</h3>
+                            <div class="flex justify-center">
+                                <img id="preview-image" alt="Uploaded Image" class="max-w-full max-h-64 object-contain rounded-lg shadow-md border-2 border-slate-200 dark:border-slate-600"/>
+                            </div>
+                            <div id="image-info" class="mt-4 text-sm text-slate-500 dark:text-slate-400 text-center"></div>
+                        </div>
+                    </div>
+
+                    <!-- Results Section -->
+                    <div class="space-y-6">
+                        <div class="bg-white dark:bg-slate-800 rounded-xl shadow-lg p-6">
+                            <h2 class="text-xl font-semibold mb-6 text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined">psychology</span>
+                                Prediction Results
+                            </h2>
+
+                            <div id="no-prediction" class="text-center py-8">
+                                <span class="material-symbols-outlined text-4xl text-slate-300 dark:text-slate-600">image</span>
+                                <p class="mt-2 text-slate-500 dark:text-slate-400">Upload an image to see predictions</p>
+                            </div>
+
+                            <div id="prediction-results" class="hidden space-y-6">
+                                <!-- Predicted Person -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Predicted Person</label>
+                                    <div class="relative">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">person</span>
+                                        <input id="predicted-name" class="form-input block w-full pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" readonly type="text" value=""/>
+                                    </div>
+                                </div>
+
+                                <!-- Confidence Score -->
+                                <div>
+                                    <label class="block text-sm font-medium text-slate-600 dark:text-slate-400 mb-2">Confidence Score</label>
+                                    <div class="relative mb-2">
+                                        <span class="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500">percent</span>
+                                        <input id="confidence-score" class="form-input block w-full pl-10 pr-3 py-3 bg-slate-50 dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-lg text-slate-900 dark:text-white font-medium focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent transition-all" readonly type="text" value=""/>
+                                    </div>
+                                    <div class="confidence-bar">
+                                        <div id="confidence-fill" class="confidence-fill" style="width: 0%"></div>
+                                    </div>
+                                    <div class="flex justify-between text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                        <span>Low</span>
+                                        <span>Medium</span>
+                                        <span>High</span>
+                                    </div>
+                                </div>
+
+                                <!-- Prediction Quality -->
+                                <div id="prediction-quality" class="hidden">
+                                    <div class="p-4 rounded-lg border-l-4">
+                                        <div class="flex items-center gap-3">
+                                            <span id="quality-icon" class="material-symbols-outlined text-2xl"></span>
+                                            <div>
+                                                <p id="quality-title" class="font-medium"></p>
+                                                <p id="quality-description" class="text-sm opacity-75"></p>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex gap-3">
+                                    <button id="try-another" class="flex-1 bg-slate-100 dark:bg-slate-700 hover:bg-slate-200 dark:hover:bg-slate-600 text-slate-700 dark:text-slate-300 font-medium py-2 px-4 rounded-lg transition-colors">
+                                        Try Another
+                                    </button>
+                                    <button id="save-result" class="flex-1 bg-primary hover:bg-primary/90 text-white font-medium py-2 px-4 rounded-lg transition-colors">
+                                        Save Result
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Model Info -->
+                        <div class="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-slate-800 dark:to-slate-900 rounded-xl p-6">
+                            <h3 class="text-lg font-semibold mb-3 text-slate-900 dark:text-white flex items-center gap-2">
+                                <span class="material-symbols-outlined">model_training</span>
+                                Model Information
+                            </h3>
+                            <div class="space-y-2 text-sm">
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600 dark:text-slate-400">Architecture:</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">Transfer Learning CNN</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600 dark:text-slate-400">Input Size:</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">224×224 pixels</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600 dark:text-slate-400">Classes:</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">62 people</span>
+                                </div>
+                                <div class="flex justify-between">
+                                    <span class="text-slate-600 dark:text-slate-400">Dataset:</span>
+                                    <span class="font-medium text-slate-900 dark:text-white">LFW (≥20 images/person)</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </main>
+
+        <footer class="border-t border-slate-200/80 dark:border-slate-800/80 mt-12">
+            <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+                <div class="grid md:grid-cols-3 gap-8">
+                    <div>
+                        <h4 class="font-semibold text-slate-900 dark:text-white mb-3">About LFW Dataset</h4>
+                        <p class="text-sm text-slate-600 dark:text-slate-400">
+                            The Labeled Faces in the Wild dataset contains face photographs of famous people collected from the web.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-slate-900 dark:text-white mb-3">Supported People</h4>
+                        <p class="text-sm text-slate-600 dark:text-slate-400">
+                            The model can recognize 62 different people, each with at least 20 training images for accuracy.
+                        </p>
+                    </div>
+                    <div>
+                        <h4 class="font-semibold text-slate-900 dark:text-white mb-3">Privacy</h4>
+                        <p class="text-sm text-slate-600 dark:text-slate-400">
+                            All image processing happens locally. No images are uploaded to external servers.
+                        </p>
+                    </div>
+                </div>
+                <div class="border-t border-slate-200 dark:border-slate-800 mt-8 pt-6 text-center text-sm text-slate-500 dark:text-slate-400">
+                    <p>© 2024 FaceID - LFW Recognition System. Educational purposes only.</p>
+                </div>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        // Theme toggle functionality
+        const themeToggle = document.getElementById('theme-toggle');
+        const html = document.documentElement;
+        
+        themeToggle.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            localStorage.setItem('theme', html.classList.contains('dark') ? 'dark' : 'light');
+        });
+
+        // Load saved theme
+        const savedTheme = localStorage.getItem('theme');
+        if (savedTheme === 'light') {
+            html.classList.remove('dark');
+        }
+
+        // Check API health on page load
+        checkAPIHealth();
+
+        // File upload functionality
+        const uploadArea = document.getElementById('upload-area');
+        const fileInput = document.getElementById('file-upload');
+        const uploadPrompt = document.getElementById('upload-prompt');
+        const loadingState = document.getElementById('loading-state');
+        const previewSection = document.getElementById('preview-section');
+        const previewImage = document.getElementById('preview-image');
+        const imageInfo = document.getElementById('image-info');
+        const noPrediction = document.getElementById('no-prediction');
+        const predictionResults = document.getElementById('prediction-results');
+
+        // API health check
+        async function checkAPIHealth() {
+            try {
+                const response = await fetch('/health');
+                const health = await response.json();
+                
+                if (health.status === 'healthy' && health.model_loaded) {
+                    console.log('✅ API is healthy and model is loaded');
+                    showConnectionStatus('connected');
+                } else {
+                    console.warn('⚠️ API issues:', health);
+                    showConnectionStatus('warning');
+                }
+            } catch (error) {
+                console.error('❌ API connection failed:', error);
+                showConnectionStatus('disconnected');
+            }
+        }
+
+        function showConnectionStatus(status) {
+            // You can add a status indicator to the UI here
+            const statusMessages = {
+                'connected': 'Model loaded and ready',
+                'warning': 'API running but model issues detected',
+                'disconnected': 'Cannot connect to prediction service'
+            };
+            
+            console.log(`Connection status: ${statusMessages[status]}`);
+        }
+
+        // Simulated LFW dataset people (for fallback display)
+        const lfwPeople = [
+            'Abdullah Gul', 'Adrien Brody', 'Al Sharpton', 'Alan Greenspan', 'Alejandro Toledo',
+            'Alvaro Uribe', 'Angelina Jolie', 'Arnold Schwarzenegger', 'Ariel Sharon', 'Ben Affleck',
+            'Bill Clinton', 'Blair Underwood', 'Carlos Menem', 'Colin Powell', 'David Beckham',
+            'Denzel Washington', 'Donald Rumsfeld', 'George W Bush', 'Gerhard Schroeder', 'Glenn Close',
+            'Gray Davis', 'Hamid Karzai', 'Hans Blix', 'Hugo Chavez', 'Jacques Chirac',
+            'Jean Chretien', 'Jennifer Aniston', 'Jennifer Capriati', 'Jennifer Lopez', 'Jeremy Greenstock',
+            'John Ashcroft', 'John Negroponte', 'Jose Bono', 'Junichiro Koizumi', 'Kofi Annan',
+            'Laura Bush', 'Lleyton Hewitt', 'Luiz Inacio Lula da Silva', 'Mahmoud Abbas', 'Megawati Sukarnoputri',
+            'Recep Tayyip Erdogan', 'Ricardo Lagos', 'Rudolph Giuliani', 'Saddam Hussein', 'Serena Williams',
+            'Silvio Berlusconi', 'Tom Daschle', 'Tom Ridge', 'Tony Blair', 'Vicente Fox',
+            'Vladimir Putin', 'Winona Ryder'
+        ];
+
+        // Drag and drop handlers
+        uploadArea.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadArea.classList.add('dragover');
+        });
+
+        uploadArea.addEventListener('dragleave', () => {
+            uploadArea.classList.remove('dragover');
+        });
+
+        uploadArea.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadArea.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handleFile(files[0]);
+            }
+        });
+
+        uploadArea.addEventListener('click', () => {
+            fileInput.click();
+        });
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            if (!file.type.startsWith('image/')) {
+                alert('Please select an image file.');
+                return;
+            }
+
+            if (file.size > 10 * 1024 * 1024) {
+                alert('File size must be less than 10MB.');
+                return;
+            }
+
+            // Show loading state
+            uploadPrompt.classList.add('hidden');
+            loadingState.classList.remove('hidden');
+
+            // Create file reader
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                
+                // Show preview
+                previewSection.classList.remove('hidden');
+                imageInfo.textContent = `${file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+
+                // Call real prediction API
+                predictWithAPI(file);
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function predictWithAPI(file) {
+            try {
+                // Create FormData for file upload
+                const formData = new FormData();
+                formData.append('image', file);
+
+                // Call Flask API
+                const response = await fetch('/predict', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (result.success) {
+                    displayPredictionResults(result);
+                } else {
+                    displayError(result.error || 'Prediction failed');
+                }
+
+            } catch (error) {
+                console.error('API Error:', error);
+                displayError('Failed to connect to prediction service. Please ensure the Flask server is running.');
+            }
+        }
+
+        function displayPredictionResults(result) {
+            // Hide loading state
+            loadingState.classList.add('hidden');
+            uploadPrompt.classList.remove('hidden');
+
+            // Show results
+            noPrediction.classList.add('hidden');
+            predictionResults.classList.remove('hidden');
+            
+            // Update prediction fields
+            document.getElementById('predicted-name').value = result.predicted_name;
+            document.getElementById('confidence-score').value = result.confidence_percentage;
+            
+            // Update confidence bar
+            const confidenceFill = document.getElementById('confidence-fill');
+            confidenceFill.style.width = `${result.confidence_score * 100}%`;
+            
+            // Show prediction quality
+            showPredictionQuality(result.confidence_score);
+            
+            // Add animation
+            predictionResults.classList.add('prediction-card');
+            setTimeout(() => {
+                predictionResults.classList.add('show');
+            }, 100);
+
+            // Log top predictions for debugging
+            if (result.top_predictions) {
+                console.log('Top 5 predictions:', result.top_predictions);
+            }
+        }
+
+        function displayError(errorMessage) {
+            // Hide loading state
+            loadingState.classList.add('hidden');
+            uploadPrompt.classList.remove('hidden');
+
+            // Show error message
+            alert(`Error: ${errorMessage}`);
+            
+            // Reset interface
+            previewSection.classList.add('hidden');
+            noPrediction.classList.remove('hidden');
+            predictionResults.classList.add('hidden');
+        }
+
+        function showPredictionQuality(confidence) {
+            const qualityElement = document.getElementById('prediction-quality');
+            const icon = document.getElementById('quality-icon');
+            const title = document.getElementById('quality-title');
+            const description = document.getElementById('quality-description');
+            
+            qualityElement.classList.remove('hidden');
+            
+            if (confidence >= 0.8) {
+                qualityElement.className = 'p-4 rounded-lg border-l-4 border-green-500 bg-green-50 dark:bg-green-900/30';
+                icon.textContent = 'check_circle';
+                icon.className = 'material-symbols-outlined text-2xl text-green-600';
+                title.textContent = 'High Confidence';
+                title.className = 'font-medium text-green-800 dark:text-green-200';
+                description.textContent = 'The model is very confident about this prediction.';
+                description.className = 'text-sm text-green-700 dark:text-green-300 opacity-75';
+            } else if (confidence >= 0.6) {
+                qualityElement.className = 'p-4 rounded-lg border-l-4 border-yellow-500 bg-yellow-50 dark:bg-yellow-900/30';
+                icon.textContent = 'warning';
+                icon.className = 'material-symbols-outlined text-2xl text-yellow-600';
+                title.textContent = 'Medium Confidence';
+                title.className = 'font-medium text-yellow-800 dark:text-yellow-200';
+                description.textContent = 'The prediction might be uncertain. Consider the result carefully.';
+                description.className = 'text-sm text-yellow-700 dark:text-yellow-300 opacity-75';
+            } else {
+                qualityElement.className = 'p-4 rounded-lg border-l-4 border-red-500 bg-red-50 dark:bg-red-900/30';
+                icon.textContent = 'error';
+                icon.className = 'material-symbols-outlined text-2xl text-red-600';
+                title.textContent = 'Low Confidence';
+                title.className = 'font-medium text-red-800 dark:text-red-200';
+                description.textContent = 'The model has low confidence. The result may not be accurate.';
+                description.className = 'text-sm text-red-700 dark:text-red-300 opacity-75';
+            }
+        }
+
+        // Action buttons
+        document.getElementById('try-another').addEventListener('click', () => {
+            // Reset the interface
+            previewSection.classList.add('hidden');
+            predictionResults.classList.remove('show');
+            setTimeout(() => {
+                predictionResults.classList.add('hidden');
+                noPrediction.classList.remove('hidden');
+                predictionResults.classList.remove('prediction-card');
+                fileInput.value = '';
+            }, 300);
+        });
+
+        document.getElementById('save-result').addEventListener('click', () => {
+            const name = document.getElementById('predicted-name').value;
+            const confidence = document.getElementById('confidence-score').value;
+            const result = `Prediction: ${name}\nConfidence: ${confidence}`;
+            
+            // Create and download a text file
+            const blob = new Blob([result], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'face_recognition_result.txt';
+            a.click();
+            URL.revokeObjectURL(url);
+        });
+    </script>
+
+    <!-- Developer Information Footer -->
+    <footer class="border-t border-slate-200/80 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 mt-16">
+        <div class="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div class="max-w-4xl mx-auto">
+                <div class="text-center mb-6">
+                    <h2 class="text-2xl font-bold text-slate-900 dark:text-white mb-4">👨‍💻 Developer Information</h2>
+                </div>
+                
+                <div class="grid md:grid-cols-2 gap-8">
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-primary">person</span>
+                            <div>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">Name:</span>
+                                <span class="ml-2 text-slate-900 dark:text-white">Chanikya</span>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-primary">mail</span>
+                            <div>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">Email:</span>
+                                <a href="mailto:karrichanikya@gmail.com" class="ml-2 text-primary hover:text-primary/80 transition-colors">karrichanikya@gmail.com</a>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-primary">phone</span>
+                            <div>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">Phone:</span>
+                                <a href="tel:+919182789929" class="ml-2 text-primary hover:text-primary/80 transition-colors">+91 9182789929</a>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-4">
+                        <div class="flex items-center gap-3">
+                            <span class="material-symbols-outlined text-primary">school</span>
+                            <div>
+                                <span class="font-medium text-slate-700 dark:text-slate-300">Purpose:</span>
+                                <span class="ml-2 text-slate-900 dark:text-white">Learning Project</span>
+                            </div>
+                        </div>
+                        
+                        <div class="p-4 rounded-lg bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800">
+                            <div class="flex items-start gap-3">
+                                <span class="material-symbols-outlined text-blue-600 dark:text-blue-400 mt-0.5">info</span>
+                                <div>
+                                    <h3 class="font-medium text-blue-800 dark:text-blue-200 mb-1">🎓 Note</h3>
+                                    <p class="text-sm text-blue-700 dark:text-blue-300">
+                                        This project is developed for educational and learning purposes to demonstrate machine learning integration with web applications.
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </footer>
+</body>
+</html>

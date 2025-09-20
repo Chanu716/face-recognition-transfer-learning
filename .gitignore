@@ -152,9 +152,11 @@ dmypy.json
 # Cython debug symbols
 cython_debug/
 
-# PyTorch model files
+# PyTorch model files (exclude trained models)
 *.pth
 *.pt
+# But include our trained model
+!best_improved_transfer_model.pth
 
 # Data files
 *.csv
@@ -179,3 +181,9 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Flask uploads directory
+uploads/
+
+# Project-specific files
+PROJECT_SUMMARY.md

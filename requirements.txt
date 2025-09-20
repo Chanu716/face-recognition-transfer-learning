@@ -1,8 +1,13 @@
 torch
 torchvision
 scikit-learn
+scipy
 matplotlib
 seaborn
 tqdm
 pillow
 numpy
+flask
+flask-cors
+werkzeug
+requests
