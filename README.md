@@ -289,7 +289,4 @@ cd face-recognition-transfer-learning
 pip install -r requirements.txt
 python app.py
 ```
-
-**[🌐 Open http://localhost:5000](http://localhost:5000)**
-
 </div>
